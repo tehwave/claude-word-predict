@@ -1,0 +1,14 @@
+{
+  "name": "tehwave",
+  "description": "Claude Code mods by tehwave.",
+  "owner": {
+    "name": "Peter Jørgensen",
+    "url": "https://github.com/tehwave"
+  },
+  "plugins": [
+    {
+      "name": "word-predict",
+      "source": "./"
+    }
+  ]
+}
