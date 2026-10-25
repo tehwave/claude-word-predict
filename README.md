@@ -1,12 +1,10 @@
 # word-predict
 
+![A suggestion strip reading ⌥1 be, ⌥2 make, ⌥3 a above a prompt box containing "i want to"](.github/social-preview.jpg)
+
 Phone-keyboard word prediction for the [Claude Code](https://claude.com/claude-code)
 prompt box. No AI: it finishes the word you are typing and suggests the next one
 from an English word list and from the way you write.
-
-```
-next   ⌥1 to   ⌥2 make   ⌥3 a
-```
 
 ## Install
 
