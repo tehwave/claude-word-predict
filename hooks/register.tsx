@@ -37,7 +37,9 @@ function parseHistory(run: { exitCode: number; stdout: string; stderr: string; i
   return JSON.parse(run.stdout) as History
 }
 
-const isLayout = (value: string): value is Layout => Object.hasOwn(LAYOUTS, value)
+const LAYOUT_NAMES: Record<Layout, string> = { us: 'US', danish: 'Danish', german: 'German', british: 'British' }
+
+const isLayout =(value: string): value is Layout => Object.hasOwn(LAYOUTS, value)
 
 /** Reads what any session may have changed: settings, learned words, the imported history. */
 async function readStored($: EngineInterface): Promise<{ settings: Settings; learned: Learned; history?: History }> {
@@ -198,7 +200,7 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const { prefix, words } = await read($, prediction)
-    const { isOn } = (await read($, shown)) as Settings
+    const { isOn, layout } = (await read($, shown)) as Settings
     isStripDrawn = isOn && !e.props.hasSurvey && !e.props.isWorking && words.length > 0
     if (!isStripDrawn) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
@@ -214,14 +216,18 @@ export const register: Register = on => {
     }
 
     return (
-      <Box flexDirection="row" gap={3}>
-        <Text dimColor>{prefix ? 'complete' : 'next'}</Text>
-        {words.map((word, i) => (
-          <Box key={`s${i}`} flexDirection="row" gap={1}>
-            <Text dimColor>{`⌥${i + 1}`}</Text>
-            <Button key={`w${i}`} label={word} plain onPress={() => press(word)} />
-          </Box>
-        ))}
+      <Box flexDirection="row" justifyContent="space-between">
+        <Box flexDirection="row" gap={3}>
+          <Text dimColor>{prefix ? 'complete' : 'next'}</Text>
+          {words.map((word, i) => (
+            <Box key={`s${i}`} flexDirection="row" gap={1}>
+              <Text dimColor>{`⌥${i + 1}`}</Text>
+              <Button key={`w${i}`} label={word} plain onPress={() => press(word)} />
+            </Box>
+          ))}
+        </Box>
+        {/* Which keyboard layout the ⌥ keys follow (/predict layout). */}
+        <Text dimColor>{LAYOUT_NAMES[layout]}</Text>
       </Box>
     )
   })

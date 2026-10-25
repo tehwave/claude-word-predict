@@ -75,6 +75,7 @@ test('Option+1 takes a word only while the strip is drawn, and pressed again typ
 
   await type($, edit('i want', '', { key: { key: 'space' } }))
   const ui = await $.ui.mount({ ...strip(), surface: 'desktop' })
+  expect((await ui.find({ type: 'Text', text: /Danish/ }))?.text).toBe('Danish')
   const picked = await type($, edit('i want', ' ¡', { key: option('¡') }))
   expect(picked).toEqual({ text: 'i want to ', cursor: 10 })
   expect(await type($, edit(picked.text, '¡', { key: option('¡'), start: 9, end: 10 }))).toEqual({
