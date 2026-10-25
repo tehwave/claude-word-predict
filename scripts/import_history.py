@@ -19,6 +19,9 @@ START = "<s>"
 NEXT_PER_WORD = 6
 NEXT_PER_PAIR = 4
 MINIMUM = 2
+# Characters per table, so the result fits the plugin's store beside the word list.
+BUDGET = 600_000
+SKIPPED = ("<", "[Request interrupted", "Caveat:")
 
 
 def bare(token):
@@ -26,35 +29,57 @@ def bare(token):
     return word if WORD.match(word) and len(word) <= 24 else None
 
 
+def typed_text(row):
+    """What the person typed in a transcript row, or None for anything else."""
+    if row.get("type") != "user" or row.get("isMeta") or row.get("isSidechain"):
+        return None
+    # Compaction summaries are Claude's words, stored as user rows.
+    if row.get("isCompactSummary") or row.get("isVisibleInTranscriptOnly"):
+        return None
+    content = (row.get("message") or {}).get("content")
+    blocks = [content] if isinstance(content, str) else [
+        b.get("text", "") for b in content or [] if isinstance(b, dict) and b.get("type") == "text"
+    ]
+    # Tags (<system-reminder>, <command-name>, ...) and notices are added by the app, block by block.
+    kept = [b.strip() for b in blocks if isinstance(b, str) and not b.lstrip().startswith(SKIPPED)]
+    text = "\n".join(b for b in kept if b)
+    return text or None
+
+
 def prompts(config_dir):
     seen = set()
     for path in glob.glob(os.path.join(config_dir, "projects", "**", "*.jsonl"), recursive=True):
-        with open(path, errors="ignore") as f:
+        if f"{os.sep}subagents{os.sep}" in path:
+            continue
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
+                if '"type":"user"' not in line:
+                    continue
                 try:
                     row = json.loads(line)
                 except ValueError:
                     continue
-                if row.get("type") != "user" or row.get("isMeta") or row.get("isSidechain"):
-                    continue
-                content = row.get("message", {}).get("content")
-                if isinstance(content, list):
-                    content = "\n".join(b.get("text", "") for b in content if b.get("type") == "text")
-                if not isinstance(content, str):
-                    continue
-                text = content.strip()
-                if not text or text.startswith(("<", "[Request interrupted", "Caveat:")) or text in seen:
-                    continue
-                seen.add(text)
-                yield text
+                text = typed_text(row)
+                # A resumed or forked session copies earlier rows: count each row once.
+                key = row.get("uuid") or text
+                if text and key not in seen:
+                    seen.add(key)
+                    yield text
 
 
-def pack(counts, keep):
+def pack(counts, keep, budget):
+    """`key:a,b|...` for the most used keys first, up to `budget` characters."""
     rows = []
-    for key, nexts in counts.items():
+    size = 0
+    for key, nexts in sorted(counts.items(), key=lambda kv: -sum(kv[1].values())):
         top = [word for word, n in nexts.most_common(keep) if n >= MINIMUM]
-        if top:
-            rows.append(key + ":" + ",".join(top))
+        if not top:
+            continue
+        row = key + ":" + ",".join(top)
+        if size + len(row) + 1 > budget:
+            break
+        rows.append(row)
+        size += len(row) + 1
     return "|".join(rows)
 
 
@@ -65,8 +90,11 @@ def main():
     count = 0
     for text in prompts(config_dir):
         count += 1
-        prose = re.sub(r"`[^`]*`", " ", re.sub(r"```[\s\S]*?```", "\n", text))
-        for sentence in re.split(r"(?<=[.!?])\s+|\n+", prose):
+        # As hooks/predict.ts `learn` does: closed fences, an unclosed one, inline code.
+        prose = re.sub(r"(```|~~~)[\s\S]*?\1", "\n", text)
+        prose = re.sub(r"(```|~~~)[\s\S]*$", "\n", prose)
+        prose = re.sub(r"`[^`\n]*`", " ", prose)
+        for sentence in re.split(r"(?<=[.!?])\s+|(?<=[.!?][\"')])\s+|\n+", prose):
             before = [START]
             for token in sentence.split():
                 word = bare(token)
@@ -77,9 +105,13 @@ def main():
                     after_one[before[-1]][word] += 1
                 if len(before) >= 2:
                     after_two[before[-2] + " " + before[-1]][word] += 1
-                before = [] if re.search(r"[.!?,;:]$", token) else (before + [word])[-2:]
+                before = [] if re.search(r"[.!?,;:][\"')]*$", token) else (before + [word])[-2:]
 
-    print(json.dumps({"prompts": count, "next": pack(after_one, NEXT_PER_WORD), "next2": pack(after_two, NEXT_PER_PAIR)}))
+    print(json.dumps({
+        "prompts": count,
+        "next": pack(after_one, NEXT_PER_WORD, BUDGET),
+        "next2": pack(after_two, NEXT_PER_PAIR, BUDGET),
+    }))
 
 
 if __name__ == "__main__":
