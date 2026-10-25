@@ -69,6 +69,41 @@ from norvig.com and builds its list locally ([`hooks/lexicon.ts`](hooks/lexicon.
 The download is checked against the SHA-256 of the exact files the mod was
 tested with, so a changed or tampered file is refused rather than used.
 
+## What it does on your machine
+
+**Network.** The mod contacts one host, `www.norvig.com`, and only to download
+two public files: `https://www.norvig.com/ngrams/count_1w.txt` and
+`https://www.norvig.com/ngrams/count_2w.txt`. Each is fetched with plain `GET`
+requests carrying a `Range` header, in pieces below Claude Code's 4 MiB response
+limit. It sends nothing else: no prompts, no words, no identifiers. This happens
+once, on the first session start (and again only if a new version changes how
+the list is built). After that it makes no network requests.
+
+**Programs.** The mod runs one program, and only when you type `/predict
+import`: `python3 -I <plugin folder>/scripts/import_history.py`. Python is
+needed because the session transcripts it counts are often larger than a mod
+may read directly. The script reads your local session transcripts under
+`~/.claude/projects` (or `$CLAUDE_CONFIG_DIR/projects`), keeps only what you
+typed, and prints word-sequence counts; the mod stores those counts and nothing
+else. The script writes no files and opens no network connections.
+
+**What it keeps.** Everything is kept in the plugin's own Claude Code store on
+your machine: the built word list, the counts from `/predict import`, word
+counts from prompts you send, and your `/predict` settings. `/predict forget`
+deletes the counts.
+
+**Hooks.**
+
+| Hook | What it does |
+| --- | --- |
+| `session.start` | Loads the stored data, registers `/predict`, and downloads the word list if it's missing or out of date |
+| `prompt.edit` | Reads each edit in the prompt box to update the suggestions. When the edit is your layout's Option+1/2/3 and a suggestion is showing, it replaces that key's character with the word; every other edit passes through unchanged |
+| `prompt.change` | Updates the suggestions when the box changes in other ways (history, clear, paste) |
+| `prompt.autocomplete` | Adds word completions to the terminal's typeahead list |
+| `prompt.submit` | After a prompt is sent, counts its words and word pairs (not code, paths or prompts another hook refused) into the local store. It never changes or blocks the prompt |
+| `command.run` | Answers `/predict` |
+| `ui.render` | Draws the suggestion strip above the prompt |
+
 ## Develop
 
 ```

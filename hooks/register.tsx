@@ -3,7 +3,7 @@ import type { EngineInterface, PromptBox, Register } from 'claude-code'
 
 import { LAYOUTS, literal, readPress, take } from './keys'
 import type { Press } from './keys'
-import { downloadLexicon, isCurrent } from './lexicon'
+import { SOURCES, buildLexicon, fetchInRanges, isCurrent } from './lexicon'
 import { addition, buildModel, empty, learn, predict } from './predict'
 import type { Model } from './predict'
 
@@ -29,10 +29,8 @@ function show($: EngineInterface, next: Prediction) {
   void $.state.set(PREDICTION, next)
 }
 
-/** Runs the history script and returns what it counted. */
-async function importHistory($: EngineInterface): Promise<History> {
-  const script = `${$.plugin.root}/scripts/import_history.py`
-  const run = await $.process.run(['python3', '-I', script], { timeoutMs: 300_000 })
+/** Reads what `/predict import`'s script printed; rejects output too large to keep. */
+function parseHistory(run: { exitCode: number; stdout: string; stderr: string; isStdoutTruncated: boolean }): History {
   if (run.exitCode !== 0) throw new Error(run.stderr.trim().split('\n').pop() || `python3 exited with code ${run.exitCode}`)
   if (run.isStdoutTruncated || run.stdout.length > MAX_HISTORY) throw new Error('your history is too large to keep')
 
@@ -88,7 +86,16 @@ export const register: Register = on => {
       void (async () => {
         $.ui.status('Downloading the word list for word prediction…')
         try {
-          const fresh = await downloadLexicon($)
+          // The only network use: two ranged GETs of Peter Norvig's count files.
+          const [words, pairs] = await Promise.all([
+            fetchInRanges(SOURCES.words, range =>
+              $.http.fetch('https://www.norvig.com/ngrams/count_1w.txt', { headers: { Range: range } }),
+            ),
+            fetchInRanges(SOURCES.pairs, range =>
+              $.http.fetch('https://www.norvig.com/ngrams/count_2w.txt', { headers: { Range: range } }),
+            ),
+          ])
+          const fresh = buildLexicon(words, pairs)
           await $.store.set('lexicon', fresh)
           lexicon = fresh
           rebuild()
@@ -177,7 +184,9 @@ export const register: Register = on => {
     if (arg === 'import') {
       let imported: History
       try {
-        imported = await importHistory($)
+        imported = parseHistory(
+          await $.process.run(['python3', '-I', `${$.plugin.root}/scripts/import_history.py`], { timeoutMs: 300_000 }),
+        )
         await $.store.set('history', imported)
       } catch (error) {
         return { text: `Could not import past sessions: ${String(error)}` }

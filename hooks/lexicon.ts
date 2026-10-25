@@ -1,23 +1,16 @@
-import type { EngineInterface } from 'claude-code'
-
 import type { Lexicon } from '../types'
 
 // Peter Norvig's English word and word-pair counts, derived from the Google Web
 // Trillion Word Corpus. Each person's copy is downloaded from his site on first
 // run and built here, so this repository ships none of the data. The hashes pin
 // the exact files the mod was built and tested against: anything else is refused.
-const SOURCES = [
-  {
-    url: 'https://www.norvig.com/ngrams/count_1w.txt',
-    bytes: 4956241,
-    sha256: '51df159fd3de12b20e403c108f526e96dbd723d9cabdd5f17955cdc16059e690',
-  },
-  {
-    url: 'https://www.norvig.com/ngrams/count_2w.txt',
-    bytes: 5566017,
-    sha256: '781c0596c3eea532d30bef9f3dba1d5137d652f00376260822c761a7584dfb8c',
-  },
-] as const
+export const SOURCES = {
+  words: { bytes: 4956241, sha256: '51df159fd3de12b20e403c108f526e96dbd723d9cabdd5f17955cdc16059e690' },
+  pairs: { bytes: 5566017, sha256: '781c0596c3eea532d30bef9f3dba1d5137d652f00376260822c761a7584dfb8c' },
+} as const
+
+/** One ranged GET of a source file, as `register.tsx` writes it with the file's fixed address. */
+export type FetchRange = (range: string) => Promise<{ status: number; text: string }>
 
 // Bumped whenever buildLexicon's output changes, so stored copies are rebuilt.
 export const LEXICON_VERSION = 2
@@ -102,34 +95,27 @@ export const isCurrent = (lexicon: Lexicon | undefined): lexicon is Lexicon =>
 const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('')
 
 /**
- * Fetches one source in ranges and checks its length and hash; rejects on any
- * mismatch. A range can end inside a multi-byte character, which arrives
- * broken as text, so each range keeps whole lines and the next starts after them.
+ * Fetches one source in ranges through `get` and checks its length and hash;
+ * rejects on any mismatch. A range can end inside a multi-byte character, which
+ * arrives broken as text, so each range keeps whole lines and the next starts after them.
  */
-async function fetchSource($: EngineInterface, source: (typeof SOURCES)[number]): Promise<string> {
+export async function fetchInRanges(source: { bytes: number; sha256: string }, get: FetchRange): Promise<string> {
   const encoder = new TextEncoder()
   const parts: string[] = []
   let start = 0
   while (start < source.bytes) {
     const end = Math.min(start + CHUNK, source.bytes) - 1
-    const response = await $.http.fetch(source.url, { headers: { Range: `bytes=${start}-${end}` } })
-    if (response.status !== 206) throw new Error(`${source.url} answered ${response.status}`)
+    const response = await get(`bytes=${start}-${end}`)
+    if (response.status !== 206) throw new Error(`the server answered ${response.status}`)
     const kept = end === source.bytes - 1 ? response.text : response.text.slice(0, response.text.lastIndexOf('\n') + 1)
-    if (kept === '') throw new Error(`${source.url} sent no whole line`)
+    if (kept === '') throw new Error('the server sent no whole line')
     parts.push(kept)
     start += encoder.encode(kept).length
   }
   const text = parts.join('')
   const bytes = encoder.encode(text)
   const digest = hex(await crypto.subtle.digest('SHA-256', bytes))
-  if (bytes.length !== source.bytes || digest !== source.sha256) throw new Error(`${source.url} is not the expected file`)
+  if (bytes.length !== source.bytes || digest !== source.sha256) throw new Error('the downloaded file is not the expected one')
 
   return text
-}
-
-/** Downloads both count files, verifies them, and builds the lexicon. */
-export async function downloadLexicon($: EngineInterface): Promise<Lexicon> {
-  const [words, pairs] = await Promise.all(SOURCES.map(source => fetchSource($, source)))
-
-  return buildLexicon(words ?? '', pairs ?? '')
 }
