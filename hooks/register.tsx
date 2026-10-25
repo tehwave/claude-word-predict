@@ -111,15 +111,6 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // The terminal's typeahead: ways to finish the word at the cursor.
-  on('prompt.autocomplete', { token: /^[A-Za-z][A-Za-z']*$/ }, async ($, e, next) => {
-    const found = await next(e)
-    if (!settings.isOn) return found
-    const mine = predict(model, learned, e.text, e.cursor, 5).words.map(text => ({ text }))
-
-    return { suggestions: [...found.suggestions, ...mine] }
-  })
-
   on('prompt.edit', async ($, e, next) => {
     const press = settings.isOn && isStripDrawn ? readPress(settings.layout, e) : undefined
     if (press) {

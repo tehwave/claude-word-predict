@@ -6,6 +6,7 @@
   "homepage": "https://github.com/tehwave/claude-word-predict",
   "repository": "https://github.com/tehwave/claude-word-predict",
   "license": "MIT",
+  "privacyPolicyUrl": "https://github.com/tehwave/claude-word-predict#privacy",
   "keywords": ["autocomplete", "prediction", "typing", "keyboard", "mod"],
   "types": "./types/index.d.ts"
 }
