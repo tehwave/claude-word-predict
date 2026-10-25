@@ -46,12 +46,12 @@ const FRAGMENTS = new Set(['re', 'll', 've', 'don', 'haven', 'isn', 'doesn', 'di
 /** Packs `word:next1,next2|...` from counts, each word's most frequent followers first. */
 const pack = (counts: Map<string, Map<string, number>>, keep: number): string => {
   const rows: string[] = []
-  for (const [key, nexts] of counts) {
+  for (const [first, nexts] of counts) {
     const top = [...nexts]
       .sort((a, b) => b[1] - a[1])
       .slice(0, keep)
       .map(([word]) => word)
-    if (top.length > 0) rows.push(`${key}:${top.join(',')}`)
+    if (top.length > 0) rows.push(`${first}:${top.join(',')}`)
   }
   return rows.join('|')
 }

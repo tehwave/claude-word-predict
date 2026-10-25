@@ -2,11 +2,19 @@
   "name": "word-predict",
   "version": "0.1.0",
   "description": "Phone-keyboard word prediction for the Claude Code prompt box: finishes the word you type and suggests the next one, from an English word list and your own prompts. No AI.",
-  "author": { "name": "Peter Jørgensen", "url": "https://github.com/tehwave" },
+  "author": {
+    "name": "Peter Jørgensen",
+    "url": "https://github.com/tehwave"
+  },
   "homepage": "https://github.com/tehwave/claude-word-predict",
   "repository": "https://github.com/tehwave/claude-word-predict",
   "license": "MIT",
   "privacyPolicyUrl": "https://github.com/tehwave/claude-word-predict#privacy",
-  "keywords": ["autocomplete", "prediction", "typing", "keyboard", "mod"],
-  "types": "./types/index.d.ts"
+  "keywords": [
+    "autocomplete",
+    "prediction",
+    "typing",
+    "keyboard",
+    "mod"
+  ]
 }
