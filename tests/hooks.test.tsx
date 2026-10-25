@@ -52,16 +52,18 @@ test('a held space shows next words; a click adds the word with its space', asyn
   const filled: string[] = []
   on('prompt.fill', (_, e) => {
     filled.push(e.text)
-    return { isFilled: true, text: '', cursor: 0 }
+    return { isFilled: true, text: 'i want to ', cursor: 10 }
   })
   await start($)
 
-  await type($, edit('i want', '', { key: { key: 'space' } }))
   for (const surface of ['terminal', 'desktop'] as const) {
+    await type($, edit('i want', '', { key: { key: 'space' } }))
     const ui = await $.ui.mount({ ...strip(), surface })
     expect((await ui.find({ key: 'w0' }))?.text).toBe('to')
     await ui.press({ key: 'w0' })
     expect(filled.pop()).toBe(' to ')
+    // A click is no keystroke: the strip moves on to the words after it.
+    expect((await ui.find({ key: 'w0' }))?.text).toBe('be')
     await ui.unmount()
   }
 })

@@ -136,16 +136,11 @@ export const register: Register = on => {
     return box
   })
 
-  on('prompt.change', async ($, e, next) => {
-    const result = await next(e)
-    lastPress = undefined
-    if (settings.isOn) show($, predict(model, learned, e.text, e.cursor))
-
-    return result
-  })
-
   on('prompt.submit', async ($, e, next) => {
     const result = await next(e)
+    // The box is empty once a prompt is sent.
+    lastPress = undefined
+    show($, NONE)
     // Learn what entered, as the hooks beneath left it; nothing from a refused prompt.
     if (result.drop !== undefined || e.command || e.isMeta) return result
 
@@ -211,7 +206,11 @@ export const register: Register = on => {
     // A press takes the word against the box as it is now.
     const press = async (word: string) => {
       const box = await $.prompt.read()
-      await $.prompt.fill({ text: addition(box.text.slice(0, box.cursor), word, prefix), mode: 'insert' })
+      const added = addition(box.text.slice(0, box.cursor), word, prefix)
+      const { isFilled } = await $.prompt.fill({ text: added, mode: 'insert' })
+      // A fill is no keystroke, so offer the next words here, for the draft as the person now sees it.
+      const text = box.text.slice(0, box.cursor) + added + box.text.slice(box.cursor)
+      if (isFilled) show($, predict(model, learned, text, box.cursor + added.length))
     }
 
     return (

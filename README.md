@@ -99,7 +99,6 @@ deletes the counts.
 | --- | --- |
 | `session.start` | Loads the stored data, registers `/predict`, and downloads the word list if it's missing or out of date |
 | `prompt.edit` | Reads each edit in the prompt box to update the suggestions. When the edit is your layout's Option+1/2/3 and a suggestion is showing, it replaces that key's character with the word; every other edit passes through unchanged |
-| `prompt.change` | Updates the suggestions when the box changes in other ways (history, clear, paste) |
 | `prompt.submit` | After a prompt is sent, counts its words and word pairs (not code, paths or prompts another hook refused) into the local store. Prompts submitted by other plugins pass through it too and are counted the same way; it never changes or blocks a prompt |
 | `command.run` | Answers `/predict` |
 | `ui.render` | Draws the suggestion strip above the prompt |
